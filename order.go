@@ -5,158 +5,32 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/gempages/go-shopify-graphql/graph/models"
 	"github.com/gempages/go-shopify-graphql/graphql"
 )
 
+//go:generate mockgen -destination=./mock/order_service.go -package=mock . OrderService
 type OrderService interface {
-	Get(id graphql.ID) (*OrderQueryResult, error)
+	Get(id graphql.ID) (*models.Order, error)
 
-	List(opts ListOptions) ([]*Order, error)
-	ListAll() ([]*Order, error)
+	List(opts ListOptions) ([]models.Order, error)
+	ListAll() ([]models.Order, error)
 
-	ListAfterCursor(opts ListOptions) ([]*OrderQueryResult, string, string, error)
+	ListAfterCursor(opts ListOptions) ([]models.Order, *string, *string, error)
 
-	Update(input OrderInput) error
-
-	GetFulfillmentOrdersAtLocation(orderID graphql.ID, locationID graphql.ID) ([]FulfillmentOrder, error)
+	Update(input models.OrderInput) error
 }
 
 type OrderServiceOp struct {
 	client *Client
 }
 
-type OrderBase struct {
-	ID                       graphql.ID         `json:"id,omitempty"`
-	LegacyResourceID         graphql.String     `json:"legacyResourceId,omitempty"`
-	Name                     graphql.String     `json:"name,omitempty"`
-	CreatedAt                DateTime           `json:"createdAt,omitempty"`
-	Closed                   graphql.Boolean    `json:"closed,omitempty"`
-	Customer                 Customer           `json:"customer,omitempty"`
-	ClientIP                 graphql.String     `json:"clientIp,omitempty"`
-	TaxLines                 []TaxLine          `json:"taxLines,omitempty"`
-	TotalReceivedSet         MoneyBag           `json:"totalReceivedSet,omitempty"`
-	ShippingAddress          MailingAddress     `json:"shippingAddress,omitempty"`
-	ShippingLine             ShippingLine       `json:"shippingLine,omitempty"`
-	Note                     graphql.String     `json:"note,omitempty"`
-	Tags                     []graphql.String   `json:"tags,omitempty"`
-	DisplayFinancialStatus   graphql.String     `json:"displayFinancialStatus,omitempty"`
-	DisplayFulfillmentStatus graphql.String     `json:"displayFulfillmentStatus,omitempty"`
-	Transactions             []OrderTransaction `json:"transactions,omitempty"`
-}
-
-type Order struct {
-	OrderBase
-
-	LineItems         []LineItem         `json:"lineItems,omitempty"`
-	FulfillmentOrders []FulfillmentOrder `json:"fulfillmentOrders,omitempty"`
-}
-
-type OrderQueryResult struct {
-	OrderBase
-
-	LineItems struct {
-		Edges []struct {
-			LineItem LineItem `json:"node,omitempty"`
-		} `json:"edges,omitempty"`
-	} `json:"lineItems,omitempty"`
-
-	FulfillmentOrders struct {
-		Edges []struct {
-			FulfillmentOrder struct {
-				ID                        graphql.ID             `json:"id,omitempty"`
-				Status                    FulfillmentOrderStatus `json:"status,omitempty"`
-				FulfillmentOrderLineItems struct {
-					Edges []struct {
-						LineItem FulfillmentOrderLineItem `json:"node,omitempty"`
-					} `json:"edges,omitempty"`
-				} `json:"lineItems,omitempty"`
-			} `json:"node,omitempty"`
-		} `json:"edges,omitempty"`
-	} `json:"fulfillmentOrders,omitempty"`
-}
-
-type ShippingLine struct {
-	Title            graphql.String `json:"title,omitempty"`
-	OriginalPriceSet MoneyBag       `json:"originalPriceSet,omitempty"`
-}
-
-type TaxLine struct {
-	PriceSet       MoneyBag       `json:"priceSet,omitempty"`
-	Rate           graphql.Float  `json:"rate,omitempty"`
-	RatePercentage graphql.Float  `json:"ratePercentage,omitempty"`
-	Title          graphql.String `json:"title,omitempty"`
-}
-
-type OrderLineItemNode struct {
-	Node LineItem `json:"node,omitempty"`
-}
-
-type LineItem struct {
-	ID                     graphql.ID      `json:"id,omitempty"`
-	SKU                    graphql.String  `json:"sku,omitempty"`
-	Quantity               graphql.Int     `json:"quantity,omitempty"`
-	FulfillableQuantity    graphql.Int     `json:"fulfillableQuantity,omitempty"`
-	FulfillmentStatus      graphql.String  `json:"fulfillmentStatus,omitempty"`
-	Vendor                 graphql.String  `json:"vendor,omitempty"`
-	Title                  graphql.String  `json:"title,omitempty"`
-	VariantTitle           graphql.String  `json:"variantTitle,omitempty"`
-	Product                LineItemProduct `json:"product,omitempty"`
-	Variant                LineItemVariant `json:"variant,omitempty"`
-	OriginalTotalSet       MoneyBag        `json:"originalTotalSet,omitempty"`
-	OriginalUnitPriceSet   MoneyBag        `json:"originalUnitPriceSet,omitempty"`
-	DiscountedUnitPriceSet MoneyBag        `json:"discountedUnitPriceSet,omitempty"`
-	DiscountedTotalSet     MoneyBag        `json:"discountedTotalSet,omitempty"`
-}
-
-type LineItemProduct struct {
-	ID               graphql.ID     `json:"id,omitempty"`
-	LegacyResourceID graphql.String `json:"legacyResourceId,omitempty"`
-}
-
-type LineItemVariant struct {
-	ID               graphql.ID       `json:"id,omitempty"`
-	LegacyResourceID graphql.String   `json:"legacyResourceId,omitempty"`
-	SelectedOptions  []SelectedOption `json:"selectedOptions,omitempty"`
-}
-
-type FulfillmentOrder struct {
-	ID                        graphql.ID                 `json:"id,omitempty"`
-	Status                    FulfillmentOrderStatus     `json:"status,omitempty"`
-	FulfillmentOrderLineItems []FulfillmentOrderLineItem `json:"lineItems,omitempty"`
-}
-
-type FulfillmentOrderStatus string
-
-type FulfillmentOrderLineItem struct {
-	ID                graphql.ID  `json:"id,omitempty"`
-	RemainingQuantity graphql.Int `json:"remainingQuantity"`
-	TotalQuantity     graphql.Int `json:"totalQuantity"`
-	LineItem          LineItem    `json:"lineItem,omitempty"`
-}
-
-type OrderTransactionStatus string
-
-type OrderTransactionKind string
-
-type OrderTransaction struct {
-	ProcessedAt DateTime               `json:"processedAt,omitempty"`
-	Status      OrderTransactionStatus `json:"status,omitempty"`
-	Kind        OrderTransactionKind   `json:"kind,omitempty"`
-	Test        graphql.Boolean        `json:"test,omitempty"`
-	AmountSet   *MoneyBag              `json:"amountSet,omitempty"`
-}
+var _ OrderService = &OrderServiceOp{}
 
 type mutationOrderUpdate struct {
-	OrderUpdateResult OrderUpdateResult `graphql:"orderUpdate(input: $input)" json:"orderUpdate"`
-}
-
-type OrderUpdateResult struct {
-	UserErrors []UserErrors `json:"userErrors"`
-}
-type OrderInput struct {
-	ID   graphql.ID       `json:"id,omitempty"`
-	Tags []graphql.String `json:"tags,omitempty"`
-	Note graphql.String   `json:"note,omitempty"`
+	OrderUpdateResult struct {
+		UserErrors []models.UserError `json:"userErrors,omitempty"`
+	} `graphql:"orderUpdate(input: $input)" json:"orderUpdate"`
 }
 
 const orderBaseQuery = `
@@ -344,7 +218,7 @@ fragment lineItem on LineItem {
 }
 `
 
-func (s *OrderServiceOp) Get(id graphql.ID) (*OrderQueryResult, error) {
+func (s *OrderServiceOp) Get(id graphql.ID) (*models.Order, error) {
 	q := fmt.Sprintf(`
 		query order($id: ID!) {
 			node(id: $id){
@@ -380,7 +254,6 @@ func (s *OrderServiceOp) Get(id graphql.ID) (*OrderQueryResult, error) {
 				}
 			}
 		}
-
 		%s
 	`, orderBaseQuery, lineItemFragment)
 
@@ -389,17 +262,17 @@ func (s *OrderServiceOp) Get(id graphql.ID) (*OrderQueryResult, error) {
 	}
 
 	out := struct {
-		Order *OrderQueryResult `json:"node"`
+		Order *models.Order `json:"node"`
 	}{}
 	err := s.client.gql.QueryString(context.Background(), q, vars, &out)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("query: %w", err)
 	}
 
 	return out.Order, nil
 }
 
-func (s *OrderServiceOp) List(opts ListOptions) ([]*Order, error) {
+func (s *OrderServiceOp) List(opts ListOptions) ([]models.Order, error) {
 	q := fmt.Sprintf(`
 		{
 			orders(query: "$query"){
@@ -417,22 +290,21 @@ func (s *OrderServiceOp) List(opts ListOptions) ([]*Order, error) {
 				}
 			}
 		}
-
 		%s
 	`, orderBaseQuery, lineItemFragment)
 
 	q = strings.ReplaceAll(q, "$query", opts.Query)
 
-	res := []*Order{}
+	res := []models.Order{}
 	err := s.client.BulkOperation.BulkQuery(q, &res)
 	if err != nil {
-		return []*Order{}, err
+		return nil, fmt.Errorf("bulk query: %w", err)
 	}
 
 	return res, nil
 }
 
-func (s *OrderServiceOp) ListAll() ([]*Order, error) {
+func (s *OrderServiceOp) ListAll() ([]models.Order, error) {
 	q := fmt.Sprintf(`
 		{
 			orders(query: "$query"){
@@ -450,27 +322,25 @@ func (s *OrderServiceOp) ListAll() ([]*Order, error) {
 				}
 			}
 		}
-
 		%s
 	`, orderBaseQuery, lineItemFragment)
 
-	res := []*Order{}
+	res := []models.Order{}
 	err := s.client.BulkOperation.BulkQuery(q, &res)
 	if err != nil {
-		return []*Order{}, err
+		return nil, fmt.Errorf("bulk query: %w", err)
 	}
 
 	return res, nil
 }
 
-func (s *OrderServiceOp) ListAfterCursor(opts ListOptions) ([]*OrderQueryResult, string, string, error) {
+func (s *OrderServiceOp) ListAfterCursor(opts ListOptions) ([]models.Order, *string, *string, error) {
 	q := fmt.Sprintf(`
 		query orders($query: String, $first: Int, $last: Int, $before: String, $after: String, $reverse: Boolean) {
 			orders(query: $query, first: $first, last: $last, before: $before, after: $after, reverse: $reverse){
 				edges{
 					node{
 						%s
-
 						lineItems(first:25){
 							edges{
 								node{
@@ -486,7 +356,6 @@ func (s *OrderServiceOp) ListAfterCursor(opts ListOptions) ([]*OrderQueryResult,
 				}
 			}
 		}
-
 		%s
 	`, orderLightQuery, lineItemFragmentLight)
 
@@ -510,8 +379,8 @@ func (s *OrderServiceOp) ListAfterCursor(opts ListOptions) ([]*OrderQueryResult,
 	out := struct {
 		Orders struct {
 			Edges []struct {
-				OrderQueryResult *OrderQueryResult `json:"node,omitempty"`
-				Cursor           string            `json:"cursor,omitempty"`
+				OrderQueryResult *models.Order `json:"node,omitempty"`
+				Cursor           string        `json:"cursor,omitempty"`
 			} `json:"edges,omitempty"`
 			PageInfo struct {
 				HasNextPage bool `json:"hasNextPage,omitempty"`
@@ -520,24 +389,24 @@ func (s *OrderServiceOp) ListAfterCursor(opts ListOptions) ([]*OrderQueryResult,
 	}{}
 	err := s.client.gql.QueryString(context.Background(), q, vars, &out)
 	if err != nil {
-		return nil, "", "", err
+		return nil, nil, nil, fmt.Errorf("query: %w", err)
 	}
 
-	res := []*OrderQueryResult{}
-	firstCursor := ""
-	lastCursor := ""
+	res := []models.Order{}
+	var firstCursor *string
+	var lastCursor *string
 	if len(out.Orders.Edges) > 0 {
-		firstCursor = out.Orders.Edges[0].Cursor
-		lastCursor = out.Orders.Edges[len(out.Orders.Edges)-1].Cursor
+		firstCursor = &out.Orders.Edges[0].Cursor
+		lastCursor = &out.Orders.Edges[len(out.Orders.Edges)-1].Cursor
 		for _, o := range out.Orders.Edges {
-			res = append(res, o.OrderQueryResult)
+			res = append(res, *o.OrderQueryResult)
 		}
 	}
 
 	return res, firstCursor, lastCursor, nil
 }
 
-func (s *OrderServiceOp) Update(input OrderInput) error {
+func (s *OrderServiceOp) Update(input models.OrderInput) error {
 	m := mutationOrderUpdate{}
 
 	vars := map[string]interface{}{
@@ -545,7 +414,7 @@ func (s *OrderServiceOp) Update(input OrderInput) error {
 	}
 	err := s.client.gql.Mutate(context.Background(), &m, vars)
 	if err != nil {
-		return err
+		return fmt.Errorf("mutation: %w", err)
 	}
 
 	if len(m.OrderUpdateResult.UserErrors) > 0 {
@@ -553,41 +422,4 @@ func (s *OrderServiceOp) Update(input OrderInput) error {
 	}
 
 	return nil
-}
-
-func (s *OrderServiceOp) GetFulfillmentOrdersAtLocation(orderID graphql.ID, locationID graphql.ID) ([]FulfillmentOrder, error) {
-	q := `
-	{
-		order(id:"$id"){
-			fulfillmentOrders(query:"$query"){
-				edges {
-					node {
-						id
-						status
-						lineItems{
-							edges {
-								node {
-									id
-									remainingQuantity
-									lineItem{
-										sku
-									}
-								}
-							}
-						}
-					}
-				}
-			}
-		}
-	}`
-
-	q = strings.ReplaceAll(q, "$id", orderID.(string))
-	q = strings.ReplaceAll(q, "$query", fmt.Sprintf(`assigned_location_id:%s`, locationID.(string)))
-	res := []FulfillmentOrder{}
-	err := s.client.BulkOperation.BulkQuery(q, &res)
-	if err != nil {
-		return []FulfillmentOrder{}, err
-	}
-
-	return res, nil
 }

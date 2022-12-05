@@ -7,7 +7,9 @@ import (
 	"reflect"
 	"sort"
 
-	"github.com/gempages/go-shopify-graphql/graphql/ident"
+	lls "github.com/emirpasic/gods/stacks/linkedliststack"
+	"github.com/r0busta/graphql/ident"
+	"github.com/thoas/go-funk"
 )
 
 func constructQuery(v interface{}, variables map[string]interface{}) string {
@@ -72,7 +74,6 @@ func writeArgumentType(w io.Writer, t reflect.Type, value bool) {
 		name := t.Name()
 		if name == "string" { // HACK: Workaround for https://github.com/shurcooL/githubv4/issues/12.
 			name = "ID"
-			// name = "String"
 		}
 		io.WriteString(w, name)
 	}
@@ -89,44 +90,91 @@ func writeArgumentType(w io.Writer, t reflect.Type, value bool) {
 // E.g., struct{Foo Int, BarBaz *Boolean} -> "{foo,barBaz}".
 func query(v interface{}) string {
 	var buf bytes.Buffer
-	writeQuery(&buf, reflect.TypeOf(v), false)
+	visited := lls.New()
+	writeQuery(&buf, reflect.TypeOf(v), false, visited)
 	return buf.String()
 }
 
 // writeQuery writes a minified query for t to w.
 // If inline is true, the struct fields of t are inlined into parent struct.
-func writeQuery(w io.Writer, t reflect.Type, inline bool) {
+func writeQuery(w io.Writer, t reflect.Type, inline bool, visited *lls.Stack) {
 	switch t.Kind() {
 	case reflect.Ptr, reflect.Slice:
-		writeQuery(w, t.Elem(), false)
+		writeQuery(w, t.Elem(), false, visited)
 	case reflect.Struct:
+		visited.Push(t)
+
 		// If the type implements json.Unmarshaler, it's a scalar. Don't expand it.
 		if reflect.PtrTo(t).Implements(jsonUnmarshaler) {
+			visited.Pop()
 			return
 		}
+
 		if !inline {
 			io.WriteString(w, "{")
 		}
+		first := true
 		for i := 0; i < t.NumField(); i++ {
-			if i != 0 {
+			field := t.Field(i)
+			baseFieldType := field.Type
+			if baseFieldType.Kind() == reflect.Ptr || baseFieldType.Kind() == reflect.Slice {
+				baseFieldType = baseFieldType.Elem()
+			}
+
+			if funk.Contains(visited.Values(), baseFieldType) {
+				continue
+			}
+
+			if baseFieldType.Kind() == reflect.Struct && baseFieldType.NumField() == 1 && structContainsVisitedType(visited, baseFieldType) {
+				continue
+			}
+
+			if !first {
 				io.WriteString(w, ",")
 			}
-			f := t.Field(i)
-			value, ok := f.Tag.Lookup("graphql")
-			inlineField := f.Anonymous && !ok
+
+			value, ok := field.Tag.Lookup("graphql")
+
+			inlineField := field.Anonymous && !ok
 			if !inlineField {
 				if ok {
 					io.WriteString(w, value)
 				} else {
-					io.WriteString(w, ident.ParseMixedCaps(f.Name).ToLowerCamelCase())
+					io.WriteString(w, ident.ParseMixedCaps(field.Name).ToLowerCamelCase())
 				}
 			}
-			writeQuery(w, f.Type, inlineField)
+
+			if !reflect.PtrTo(field.Type).Implements(jsonUnmarshaler) {
+				visited.Push(baseFieldType)
+			}
+			writeQuery(w, field.Type, inlineField, visited)
+			if !reflect.PtrTo(field.Type).Implements(jsonUnmarshaler) {
+				visited.Pop()
+			}
+
+			first = false
 		}
 		if !inline {
 			io.WriteString(w, "}")
 		}
+
+		visited.Pop()
 	}
+}
+
+func structContainsVisitedType(visited *lls.Stack, t reflect.Type) bool {
+	for i := 0; i < t.NumField(); i++ {
+		ft := t.Field(i).Type
+		if ft.Kind() == reflect.Ptr || ft.Kind() == reflect.Slice {
+			ft = ft.Elem()
+		}
+
+		if funk.Contains(visited.Values(), ft) {
+			return true
+		}
+	}
+
+	return false
 }
 
 var jsonUnmarshaler = reflect.TypeOf((*json.Unmarshaler)(nil)).Elem()

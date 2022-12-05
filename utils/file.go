@@ -3,7 +3,6 @@ package utils
 import (
 	"context"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 
@@ -12,17 +11,17 @@ import (
 )
 
 func CloseFile(f *os.File) {
-	err := f.Close()
-	if err != nil {
+	if err := f.Close(); err != nil {
 		panic(err)
 	}
 }
 
-func ReadFile(file string) (data string, err error) {
+func ReadFile(file string) (string, error) {
 	var bytes []byte
-	bytes, err = ioutil.ReadFile(file)
-	data = string(bytes)
-	return
+	bytes, err := os.ReadFile(file)
+	data := string(bytes)
+
+	return data, err
 }
 
 func DownloadFile(ctx context.Context, filepath string, url string) error {
@@ -47,5 +46,6 @@ func DownloadFile(ctx context.Context, filepath string, url string) error {
 	defer CloseFile(out)
 
 	_, err = io.Copy(out, resp.Body)
+
 	return err
 }

@@ -41,7 +41,7 @@ func WithVersion(apiVersion string) Option {
 	}
 }
 
-func WithStoreFrontVersion(apiVersion string) Option {
+func WithStorefrontVersion(apiVersion string) Option {
 	return func(t *transport) {
 		if apiVersion != "" {
 			apiPathPrefix = fmt.Sprintf("api/%s", apiVersion)
@@ -58,35 +58,40 @@ func WithToken(token string) Option {
 	}
 }
 
-func WithStoreFrontToken(token string) Option {
+// WithStoreFrontToken optionally sets storefront token
+
+func WithStorefrontToken(token string) Option {
 	return func(t *transport) {
-		t.storeFrontAccessToken = token
+		t.storefrontToken = token
 	}
 }
 
 // WithPrivateAppAuth optionally sets private app credentials
-func WithPrivateAppAuth(apiKey string, password string) Option {
+func WithPrivateAppAuth(apiKey string, token string) Option {
 	return func(t *transport) {
 		t.apiKey = apiKey
-		t.password = password
+		t.accessToken = token
 	}
 }
 
 type transport struct {
-	ctx                   context.Context
-	accessToken           string
-	storeFrontAccessToken string
-	apiKey                string
-	password              string
+	ctx             context.Context
+	accessToken     string
+	storefrontToken string
+	apiKey          string
 }
 
 func (t *transport) RoundTrip(req *http.Request) (*http.Response, error) {
-	if t.accessToken != "" {
+	isAccessTokenSet := t.accessToken != ""
+	isStorefrontTokenSet := t.storefrontToken != ""
+	areBasicAuthCredentialsSet := t.apiKey != "" && isAccessTokenSet
+
+	if isAccessTokenSet {
 		req.Header.Set(shopifyAccessTokenHeader, t.accessToken)
-	} else if t.apiKey != "" && t.password != "" {
-		req.SetBasicAuth(t.apiKey, t.password)
-	} else if t.storeFrontAccessToken != "" {
-		req.Header.Set(shopifyStoreFrontAccessTokenHeader, t.storeFrontAccessToken)
+	} else if areBasicAuthCredentialsSet {
+		req.SetBasicAuth(t.apiKey, t.accessToken)
+	} else if isStorefrontTokenSet {
+		req.Header.Set(shopifyStoreFrontAccessTokenHeader, t.storefrontToken)
 	}
 
 	return http.DefaultTransport.RoundTrip(req)
@@ -114,5 +119,4 @@ func NewClient(shopName string, opts ...Option) *graphql.Client {
 
 func buildAPIEndpoint(shopName string) string {
 	return fmt.Sprintf("%s://%s/%s/%s", apiProtocol, shopName, apiPathPrefix, apiEndpoint)
-	// return fmt.Sprintf("%s://%s.%s/%s/%s", apiProtocol, shopName, shopifyBaseDomain, apiPathPrefix, apiEndpoint)
 }

@@ -4,67 +4,40 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/gempages/go-shopify-graphql/graphql"
+	"github.com/gempages/go-shopify-graphql/graph/models"
 )
 
+//go:generate mockgen -destination=./mock/inventory_service.go -package=mock . InventoryService
 type InventoryService interface {
-	Update(id graphql.ID, input InventoryItemUpdateInput) error
-	Adjust(locationID graphql.ID, input []InventoryAdjustItemInput) error
-	ActivateInventory(locationID graphql.ID, id graphql.ID) error
+	Update(id string, input models.InventoryItemUpdateInput) error
+	Adjust(locationID string, input []models.InventoryAdjustItemInput) error
+	ActivateInventory(locationID string, id string) error
 }
-
 type InventoryServiceOp struct {
 	client *Client
 }
 
-type InventoryItem struct {
-	ID               graphql.ID     `json:"id,omitempty"`
-	LegacyResourceID graphql.String `json:"legacyResourceId,omitempty"`
-	SKU              graphql.String `json:"sku,omitempty"`
-	UnitCost         MoneyV2        `json:"unitCost,omitempty"`
-	RequiresShipping bool           `json:"requiresShipping,omitempty"`
-}
-
-type InventoryLevel struct {
-	UpdatedAt graphql.String `json:"updatedAt,omitempty"`
-	Available graphql.Int    `json:"available,omitempty"`
-	Item      InventoryItem  `json:"item,omitempty"`
-}
-
-type InventoryItemUpdateInput struct {
-	Cost graphql.Float `json:"cost,omitempty"`
-}
+var _ InventoryService = &InventoryServiceOp{}
 
 type mutationInventoryItemUpdate struct {
-	InventoryItemUpdateResult InventoryItemUpdateResult `graphql:"inventoryItemUpdate(id: $id, input: $input)" json:"inventoryItemUpdate"`
-}
-
-type InventoryItemUpdateResult struct {
-	UserErrors []UserErrors `json:"userErrors,omitempty"`
-}
-
-type InventoryAdjustItemInput struct {
-	InventoryItemID graphql.ID  `json:"inventoryItemId,omitempty"`
-	AvailableDelta  graphql.Int `json:"availableDelta,omitempty"`
+	InventoryItemUpdateResult struct {
+		UserErrors []models.UserError `json:"userErrors,omitempty"`
+	} `graphql:"inventoryItemUpdate(id: $id, input: $input)" json:"inventoryItemUpdate"`
 }
 
 type mutationInventoryBulkAdjustQuantityAtLocation struct {
-	InventoryBulkAdjustQuantityAtLocationResult InventoryBulkAdjustQuantityAtLocationResult `graphql:"inventoryBulkAdjustQuantityAtLocation(locationId: $locationId, inventoryItemAdjustments: $inventoryItemAdjustments)" json:"inventoryBulkAdjustQuantityAtLocation"`
-}
-
-type InventoryBulkAdjustQuantityAtLocationResult struct {
-	UserErrors []UserErrors `json:"userErrors,omitempty"`
+	InventoryBulkAdjustQuantityAtLocationResult struct {
+		UserErrors []models.UserError `json:"userErrors,omitempty"`
+	} `graphql:"inventoryBulkAdjustQuantityAtLocation(locationId: $locationId, inventoryItemAdjustments: $inventoryItemAdjustments)" json:"inventoryBulkAdjustQuantityAtLocation"`
 }
 
 type mutationInventoryActivate struct {
-	InventoryActivateResult InventoryActivateResult `graphql:"inventoryActivate(inventoryItemId: $itemID, locationId: $locationId)" json:"inventoryActivate"`
+	InventoryActivateResult struct {
+		UserErrors []models.UserError `json:"userErrors,omitempty"`
+	} `graphql:"inventoryActivate(inventoryItemId: $itemID, locationId: $locationId)" json:"inventoryActivate"`
 }
 
-type InventoryActivateResult struct {
-	UserErrors []UserErrors `json:"userErrors,omitempty"`
-}
-
-func (s *InventoryServiceOp) Update(id graphql.ID, input InventoryItemUpdateInput) error {
+func (s *InventoryServiceOp) Update(id string, input models.InventoryItemUpdateInput) error {
 	m := mutationInventoryItemUpdate{}
 	vars := map[string]interface{}{
 		"id":    id,
@@ -72,7 +45,7 @@ func (s *InventoryServiceOp) Update(id graphql.ID, input InventoryItemUpdateInpu
 	}
 	err := s.client.gql.Mutate(context.Background(), &m, vars)
 	if err != nil {
-		return err
+		return fmt.Errorf("mutation: %w", err)
 	}
 
 	if len(m.InventoryItemUpdateResult.UserErrors) > 0 {
@@ -82,7 +55,7 @@ func (s *InventoryServiceOp) Update(id graphql.ID, input InventoryItemUpdateInpu
 	return nil
 }
 
-func (s *InventoryServiceOp) Adjust(locationID graphql.ID, input []InventoryAdjustItemInput) error {
+func (s *InventoryServiceOp) Adjust(locationID string, input []models.InventoryAdjustItemInput) error {
 	m := mutationInventoryBulkAdjustQuantityAtLocation{}
 	vars := map[string]interface{}{
 		"locationId":               locationID,
@@ -90,7 +63,7 @@ func (s *InventoryServiceOp) Adjust(locationID graphql.ID, input []InventoryAdju
 	}
 	err := s.client.gql.Mutate(context.Background(), &m, vars)
 	if err != nil {
-		return err
+		return fmt.Errorf("mutation: %w", err)
 	}
 
 	if len(m.InventoryBulkAdjustQuantityAtLocationResult.UserErrors) > 0 {
@@ -100,7 +73,7 @@ func (s *InventoryServiceOp) Adjust(locationID graphql.ID, input []InventoryAdju
 	return nil
 }
 
-func (s *InventoryServiceOp) ActivateInventory(locationID graphql.ID, id graphql.ID) error {
+func (s *InventoryServiceOp) ActivateInventory(locationID string, id string) error {
 	m := mutationInventoryActivate{}
 	vars := map[string]interface{}{
 		"itemID":     id,
@@ -108,7 +81,7 @@ func (s *InventoryServiceOp) ActivateInventory(locationID graphql.ID, id graphql
 	}
 	err := s.client.gql.Mutate(context.Background(), &m, vars)
 	if err != nil {
-		return err
+		return fmt.Errorf("mutation: %w", err)
 	}
 
 	if len(m.InventoryActivateResult.UserErrors) > 0 {

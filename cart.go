@@ -3,6 +3,8 @@ package shopify
 import (
 	"context"
 	"fmt"
+
+	"github.com/gempages/go-shopify-graphql/graph/models"
 	"github.com/gempages/go-shopify-graphql/graphql"
 )
 
@@ -23,101 +25,101 @@ type CartServiceOp struct {
 const cartBaseQuery = `
 	id
 	attributes {
-        key
-        value
-    }
-    buyerIdentity{
-        countryCode
-        customer {
-            addresses(first:250){
-                edges {
-                    node {
-                        address1
-                        address2
-                    }
-                }
-            }
-        }
-    }
-    checkoutUrl
+       key
+       value
+   }
+   buyerIdentity{
+       countryCode
+       customer {
+           addresses(first:250){
+               edges {
+                   node {
+                       address1
+                       address2
+                   }
+               }
+           }
+       }
+   }
+   checkoutUrl
 	createdAt
-    updatedAt
-    discountCodes {
-        applicable
-        code
-    }
-    estimatedCost {
-        totalAmount {
-            amount
-            currencyCode
-        }
-        subtotalAmount {
-            amount
-            currencyCode
-        }
-        totalTaxAmount {
-            amount
-            currencyCode
-        }
-        totalDutyAmount {
-            amount
-            currencyCode
-        }
-    }
-    lines(first:250) {
-        edges {
-            node {
-                attributes {
-                    key
-                    value
-                }
-                id
-                quantity
-                discountAllocations {
-                    discountedAmount {
-                        amount
-                        currencyCode
-                    }
-                }
-                estimatedCost {
-                    subtotalAmount {
-                        amount
-                        currencyCode
-                    }
-                    totalAmount {
-                        amount 
-                        currencyCode
-                    }
-                }
-                merchandise {
-                    ... on ProductVariant {
-                        id
-                    }
-                }
-                sellingPlanAllocation {
-                    priceAdjustments {
-                        compareAtPrice {
-                            amount
-                            currencyCode
-                        }
-                        perDeliveryPrice {
-                            amount
-                            currencyCode
-                        }
-                        price {
-                            amount
-                            currencyCode
-                        }
-                        unitPrice {
-                            amount  
-                            currencyCode
-                        }
-                    }
-                }
-            }
-        }
-    }
-    note
+   updatedAt
+   discountCodes {
+       applicable
+       code
+   }
+   estimatedCost {
+       totalAmount {
+           amount
+           currencyCode
+       }
+       subtotalAmount {
+           amount
+           currencyCode
+       }
+       totalTaxAmount {
+           amount
+           currencyCode
+       }
+       totalDutyAmount {
+           amount
+           currencyCode
+       }
+   }
+   lines(first:250) {
+       edges {
+           node {
+               attributes {
+                   key
+                   value
+               }
+               id
+               quantity
+               discountAllocations {
+                   discountedAmount {
+                       amount
+                       currencyCode
+                   }
+               }
+               estimatedCost {
+                   subtotalAmount {
+                       amount
+                       currencyCode
+                   }
+                   totalAmount {
+                       amount
+                       currencyCode
+                   }
+               }
+               merchandise {
+                   ... on ProductVariant {
+                       id
+                   }
+               }
+               sellingPlanAllocation {
+                   priceAdjustments {
+                       compareAtPrice {
+                           amount
+                           currencyCode
+                       }
+                       perDeliveryPrice {
+                           amount
+                           currencyCode
+                       }
+                       price {
+                           amount
+                           currencyCode
+                       }
+                       unitPrice {
+                           amount
+                           currencyCode
+                       }
+                   }
+               }
+           }
+       }
+   }
+   note
 `
 
 func (c CartServiceOp) Get(id graphql.String) (*Cart, error) {
@@ -150,7 +152,7 @@ type CartResult struct {
 	Cart struct {
 		ID graphql.String `json:"id,omitempty"`
 	}
-	UserErrors []UserErrors `json:"userErrors"`
+	UserErrors []models.UserError `json:"userErrors"`
 }
 
 type MutationCartCreate struct {
@@ -308,7 +310,7 @@ type Cart struct {
 			Node   CartLine       `json:"node,omitempty"`
 			Cursor graphql.String `json:"cursor,omitempty"`
 		} `json:"edges,omitempty"`
-		PageInfo PageInfo `json:"pageInfo,omitempty"`
+		PageInfo models.PageInfo `json:"pageInfo,omitempty"`
 	} `json:"lines,omitempty"`
 	Note      graphql.String `json:"note,omitempty"`
 	UpdatedAt DateTime       `json:"updatedAt,omitempty"`
@@ -325,16 +327,16 @@ type CartLine struct {
 }
 
 type CartDiscountAllocation struct {
-	DiscountedAmount MoneyV2 `json:"discountedAmount,omitempty"`
+	DiscountedAmount models.MoneyV2 `json:"discountedAmount,omitempty"`
 }
 
 type CartLineEstimatedCost struct {
-	SubtotalAmount MoneyV2 `json:"subtotalAmount,omitempty"`
-	TotalAmount    MoneyV2 `json:"totalAmount,omitempty"`
+	SubtotalAmount models.MoneyV2 `json:"subtotalAmount,omitempty"`
+	TotalAmount    models.MoneyV2 `json:"totalAmount,omitempty"`
 }
 
 type Merchandise struct {
-	ProductVariant
+	models.ProductVariant
 }
 
 type SellingPlanAllocation struct {
@@ -343,10 +345,10 @@ type SellingPlanAllocation struct {
 }
 
 type SellingPlanAllocationPriceAdjustment struct {
-	CompareAtPrice   MoneyV2 `json:"compareAtPrice,omitempty"`
-	PerDeliveryPrice MoneyV2 `json:"perDeliveryPrice,omitempty"`
-	Price            MoneyV2 `json:"price,omitempty"`
-	UnitPrice        MoneyV2 `json:"unitPrice,omitempty"`
+	CompareAtPrice   models.MoneyV2 `json:"compareAtPrice,omitempty"`
+	PerDeliveryPrice models.MoneyV2 `json:"perDeliveryPrice,omitempty"`
+	Price            models.MoneyV2 `json:"price,omitempty"`
+	UnitPrice        models.MoneyV2 `json:"unitPrice,omitempty"`
 }
 
 type SellingPlan struct {
@@ -374,10 +376,10 @@ type CartDiscountCode struct {
 }
 
 type CartEstimatedCost struct {
-	SubtotalAmount  MoneyV2 `json:"subtotalAmount,omitempty"`
-	TotalAmount     MoneyV2 `json:"totalAmount,omitempty"`
-	TotalDutyAmount MoneyV2 `json:"totalDutyAmount,omitempty"`
-	TotalTaxAmount  MoneyV2 `json:"totalTaxAmount,omitempty"`
+	SubtotalAmount  models.MoneyV2 `json:"subtotalAmount,omitempty"`
+	TotalAmount     models.MoneyV2 `json:"totalAmount,omitempty"`
+	TotalDutyAmount models.MoneyV2 `json:"totalDutyAmount,omitempty"`
+	TotalTaxAmount  models.MoneyV2 `json:"totalTaxAmount,omitempty"`
 }
 
 type Attribute struct {
@@ -418,22 +420,22 @@ type CartCustomer struct {
 	AcceptsMarketing graphql.Boolean `json:"acceptsMarketing"`
 	Addresses        struct {
 		Edges []struct {
-			Node   MailingAddress `json:"node,omitempty"`
-			Cursor graphql.String `json:"cursor,omitempty"`
+			Node   models.MailingAddress `json:"node,omitempty"`
+			Cursor graphql.String        `json:"cursor,omitempty"`
 		} `json:"edges,omitempty"`
 		PageInfo PageInfo `json:"pageInfo,omitempty"`
 	} `json:"addresses,omitempty"`
-	CreatedAt              DateTime       `json:"createdAt,omitempty"`
-	DefaultAddress         MailingAddress `json:"defaultAddress,omitempty"`
-	DisplayName            graphql.String `json:"displayName,omitempty"`
-	Email                  graphql.String `json:"email,omitempty"`
-	FirstName              graphql.String `json:"firstName,omitempty"`
-	ID                     graphql.String `json:"id,omitempty"`
-	LastIncompleteCheckout Checkout       `json:"lastIncompleteCheckout,omitempty"`
-	LastName               graphql.String `json:"lastName,omitempty"`
+	CreatedAt              DateTime              `json:"createdAt,omitempty"`
+	DefaultAddress         models.MailingAddress `json:"defaultAddress,omitempty"`
+	DisplayName            graphql.String        `json:"displayName,omitempty"`
+	Email                  graphql.String        `json:"email,omitempty"`
+	FirstName              graphql.String        `json:"firstName,omitempty"`
+	ID                     graphql.String        `json:"id,omitempty"`
+	LastIncompleteCheckout Checkout              `json:"lastIncompleteCheckout,omitempty"`
+	LastName               graphql.String        `json:"lastName,omitempty"`
 	Orders                 struct {
 		Edges []struct {
-			Node   Order          `json:"node,omitempty"`
+			Node   models.Order   `json:"node,omitempty"`
 			Cursor graphql.String `json:"cursor,omitempty"`
 		} `json:"edges,omitempty"`
 		PageInfo PageInfo `json:"pageInfo,omitempty"`
@@ -455,12 +457,12 @@ type Checkout struct {
 	ID                          graphql.String         `json:"id,omitempty"`
 	LineItemsSubtotalPrice      MoneyV2                `json:"lineItemsSubtotalPrice,omitempty"`
 	Note                        graphql.String         `json:"note,omitempty"`
-	Order                       Order                  `json:"order,omitempty"`
+	Order                       models.Order           `json:"order,omitempty"`
 	OrderStatusUrl              graphql.String         `json:"orderStatusUrl,omitempty"`
 	PaymentDueV2                MoneyV2                `json:"paymentDueV2,omitempty"`
 	Ready                       graphql.Boolean        `json:"ready,omitempty"`
 	RequiresShipping            graphql.Boolean        `json:"requiresShipping,omitempty"`
-	ShippingAddress             MailingAddress         `json:"shippingAddress,omitempty"`
+	ShippingAddress             models.MailingAddress  `json:"shippingAddress,omitempty"`
 	ShippingDiscountAllocations []DiscountAllocation   `json:"shippingDiscountAllocations,omitempty"`
 	ShippingLine                ShippingRate           `json:"shippingLine,omitempty"`
 	SubtotalPriceV2             MoneyV2                `json:"subtotalPriceV2,omitempty"`

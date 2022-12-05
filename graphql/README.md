@@ -1,23 +1,16 @@
-graphql
-=======
-
-[![Build Status](https://travis-ci.org/shurcooL/graphql.svg?branch=master)](https://travis-ci.org/shurcooL/graphql) [![GoDoc](https://godoc.org/github.com/shurcooL/graphql?status.svg)](https://godoc.org/github.com/shurcooL/graphql)
+# graphql
 
 Package `graphql` provides a GraphQL client implementation.
 
-For more information, see package [`github.com/shurcooL/githubv4`](https://github.com/shurcooL/githubv4), which is a specialized version targeting GitHub GraphQL API v4. That package is driving the feature development.
-
-Installation
-------------
+## Installation
 
 `graphql` requires Go version 1.8 or later.
 
 ```bash
-go get -u github.com/shurcooL/graphql
+go get -u github.com/r0busta/graphql
 ```
 
-Usage
------
+## Usage
 
 Construct a GraphQL client, specifying the GraphQL server URL. Then, you can use it to make GraphQL queries and mutations.
 
@@ -28,19 +21,19 @@ client := graphql.NewClient("https://example.com/graphql", nil)
 
 ### Authentication
 
-Some GraphQL servers may require authentication. The `graphql` package does not directly handle authentication. Instead, when creating a new client, you're expected to pass an `http.Client` that performs authentication. The easiest and recommended way to do this is to use the [`golang.org/x/oauth2`](https://golang.org/x/oauth2) package. You'll need an OAuth token with the right scopes. Then:
+Some GraphQL servers may require authentication. The `graphql` package does not directly handle authentication. Instead, when creating a new client, you're expected to pass an `http.Client` that performs authentication. The easiest and recommended way to do this is to use the [golang.org/x/oauth2](https://golang.org/x/oauth2) package. You'll need an OAuth token with the right scopes. Then:
 
 ```Go
 import "golang.org/x/oauth2"
 
 func main() {
-	src := oauth2.StaticTokenSource(
-		&oauth2.Token{AccessToken: os.Getenv("GRAPHQL_TOKEN")},
-	)
-	httpClient := oauth2.NewClient(context.Background(), src)
+    src := oauth2.StaticTokenSource(
+        &oauth2.Token{AccessToken: os.Getenv("GRAPHQL_TOKEN")},
+    )
+    httpClient := oauth2.NewClient(context.Background(), src)
 
-	client := graphql.NewClient("https://example.com/graphql", httpClient)
-	// Use client...
+    client := graphql.NewClient("https://example.com/graphql", httpClient)
+    // Use client...
 ```
 
 ### Simple Query
@@ -51,9 +44,9 @@ For example, to make the following GraphQL query:
 
 ```GraphQL
 query {
-	me {
-		name
-	}
+    me {
+        name
+    }
 }
 ```
 
@@ -61,18 +54,18 @@ You can define this variable:
 
 ```Go
 var query struct {
-	Me struct {
-		Name graphql.String
-	}
+    Me struct {
+        Name graphql.String
+    }
 }
 ```
 
-Then call `client.Query`, passing a pointer to it:
+Then call `client. Query` , passing a pointer to it:
 
 ```Go
 err := client.Query(context.Background(), &query, nil)
 if err != nil {
-	// Handle error.
+    // Handle error.
 }
 fmt.Println(query.Me.Name)
 
@@ -87,10 +80,10 @@ For example, to make the following GraphQL query:
 
 ```GraphQL
 {
-	human(id: "1000") {
-		name
-		height(unit: METER)
-	}
+    human(id: "1000") {
+        name
+        height(unit: METER)
+    }
 }
 ```
 
@@ -98,19 +91,19 @@ You can define this variable:
 
 ```Go
 var q struct {
-	Human struct {
-		Name   graphql.String
-		Height graphql.Float `graphql:"height(unit: METER)"`
-	} `graphql:"human(id: \"1000\")"`
+    Human struct {
+        Name   graphql.String
+        Height graphql.Float `graphql:"height(unit: METER)"`
+    } `graphql:"human(id: \"1000\")"`
 }
 ```
 
-Then call `client.Query`:
+Then call `client. Query` :
 
 ```Go
 err := client.Query(context.Background(), &q, nil)
 if err != nil {
-	// Handle error.
+    // Handle error.
 }
 fmt.Println(q.Human.Name)
 fmt.Println(q.Human.Height)
@@ -124,10 +117,10 @@ However, that'll only work if the arguments are constant and known in advance. O
 
 ```Go
 var q struct {
-	Human struct {
-		Name   graphql.String
-		Height graphql.Float `graphql:"height(unit: $unit)"`
-	} `graphql:"human(id: $id)"`
+    Human struct {
+        Name   graphql.String
+        Height graphql.Float `graphql:"height(unit: $unit)"`
+    } `graphql:"human(id: $id)"`
 }
 ```
 
@@ -135,17 +128,17 @@ Then, define a `variables` map with their values:
 
 ```Go
 variables := map[string]interface{}{
-	"id":   graphql.ID(id),
-	"unit": starwars.LengthUnit("METER"),
+    "id":   graphql.ID(id),
+    "unit": starwars.LengthUnit("METER"),
 }
 ```
 
-Finally, call `client.Query` providing `variables`:
+Finally, call `client.Query` providing `variables` :
 
 ```Go
 err := client.Query(context.Background(), &q, variables)
 if err != nil {
-	// Handle error.
+    // Handle error.
 }
 ```
 
@@ -157,15 +150,15 @@ For example, to make the following GraphQL query:
 
 ```GraphQL
 {
-	hero(episode: "JEDI") {
-		name
-		... on Droid {
-			primaryFunction
-		}
-		... on Human {
-			height
-		}
-	}
+    hero(episode: "JEDI") {
+        name
+        ... on Droid {
+            primaryFunction
+        }
+        ... on Human {
+            height
+        }
+    }
 }
 ```
 
@@ -173,15 +166,15 @@ You can define this variable:
 
 ```Go
 var q struct {
-	Hero struct {
-		Name  graphql.String
-		Droid struct {
-			PrimaryFunction graphql.String
-		} `graphql:"... on Droid"`
-		Human struct {
-			Height graphql.Float
-		} `graphql:"... on Human"`
-	} `graphql:"hero(episode: \"JEDI\")"`
+    Hero struct {
+        Name  graphql.String
+        Droid struct {
+            PrimaryFunction graphql.String
+        } `graphql:"... on Droid"`
+        Human struct {
+            Height graphql.Float
+        } `graphql:"... on Human"`
+    } `graphql:"hero(episode: \"JEDI\")"`
 }
 ```
 
@@ -189,29 +182,29 @@ Alternatively, you can define the struct types corresponding to inline fragments
 
 ```Go
 type (
-	DroidFragment struct {
-		PrimaryFunction graphql.String
-	}
-	HumanFragment struct {
-		Height graphql.Float
-	}
+    DroidFragment struct {
+        PrimaryFunction graphql.String
+    }
+    HumanFragment struct {
+        Height graphql.Float
+    }
 )
 
 var q struct {
-	Hero struct {
-		Name          graphql.String
-		DroidFragment `graphql:"... on Droid"`
-		HumanFragment `graphql:"... on Human"`
-	} `graphql:"hero(episode: \"JEDI\")"`
+    Hero struct {
+        Name          graphql.String
+        DroidFragment `graphql:"... on Droid"`
+        HumanFragment `graphql:"... on Human"`
+    } `graphql:"hero(episode: \"JEDI\")"`
 }
 ```
 
-Then call `client.Query`:
+Then call `client. Query` :
 
 ```Go
 err := client.Query(context.Background(), &q, nil)
 if err != nil {
-	// Handle error.
+    // Handle error.
 }
 fmt.Println(q.Hero.Name)
 fmt.Println(q.Hero.PrimaryFunction)
@@ -231,17 +224,17 @@ For example, to make the following GraphQL mutation:
 
 ```GraphQL
 mutation($ep: Episode!, $review: ReviewInput!) {
-	createReview(episode: $ep, review: $review) {
-		stars
-		commentary
-	}
+    createReview(episode: $ep, review: $review) {
+        stars
+        commentary
+    }
 }
 variables {
-	"ep": "JEDI",
-	"review": {
-		"stars": 5,
-		"commentary": "This is a great movie!"
-	}
+    "ep": "JEDI",
+    "review": {
+        "stars": 5,
+        "commentary": "This is a great movie!"
+    }
 }
 ```
 
@@ -249,26 +242,26 @@ You can define:
 
 ```Go
 var m struct {
-	CreateReview struct {
-		Stars      graphql.Int
-		Commentary graphql.String
-	} `graphql:"createReview(episode: $ep, review: $review)"`
+    CreateReview struct {
+        Stars      graphql.Int
+        Commentary graphql.String
+    } `graphql:"createReview(episode: $ep, review: $review)"`
 }
 variables := map[string]interface{}{
-	"ep": starwars.Episode("JEDI"),
-	"review": starwars.ReviewInput{
-		Stars:      graphql.Int(5),
-		Commentary: graphql.String("This is a great movie!"),
-	},
+    "ep": starwars.Episode("JEDI"),
+    "review": starwars.ReviewInput{
+        Stars:      graphql.Int(5),
+        Commentary: graphql.String("This is a great movie!"),
+    },
 }
 ```
 
-Then call `client.Mutate`:
+Then call `client. Mutate` :
 
 ```Go
 err := client.Mutate(context.Background(), &m, variables)
 if err != nil {
-	// Handle error.
+    // Handle error.
 }
 fmt.Printf("Created a %v star review: %v\n", m.CreateReview.Stars, m.CreateReview.Commentary)
 
@@ -276,16 +269,14 @@ fmt.Printf("Created a %v star review: %v\n", m.CreateReview.Stars, m.CreateRevie
 // Created a 5 star review: This is a great movie!
 ```
 
-Directories
------------
+## Directories
 
 | Path                                                                                   | Synopsis                                                                                                        |
 |----------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------|
-| [example/graphqldev](https://godoc.org/github.com/shurcooL/graphql/example/graphqldev) | graphqldev is a test program currently being used for developing graphql package.                               |
-| [ident](https://godoc.org/github.com/shurcooL/graphql/ident)                           | Package ident provides functions for parsing and converting identifier names between various naming convention. |
-| [internal/jsonutil](https://godoc.org/github.com/shurcooL/graphql/internal/jsonutil)   | Package jsonutil provides a function for decoding JSON into a GraphQL query data structure.                     |
+| [example/graphqldev](https://godoc.org/github.com/r0busta/graphql/example/graphqldev) | graphqldev is a test program currently being used for developing graphql package.                               |
+| [ident](https://godoc.org/github.com/r0busta/graphql/ident)                           | Package ident provides functions for parsing and converting identifier names between various naming convention. |
+| [internal/jsonutil](https://godoc.org/github.com/r0busta/graphql/internal/jsonutil)   | Package jsonutil provides a function for decoding JSON into a GraphQL query data structure.                     |
 
-License
--------
+## License
 
--	[MIT License](LICENSE)
+- [MIT License](LICENSE)

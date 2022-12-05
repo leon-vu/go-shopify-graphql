@@ -6,14 +6,46 @@ import (
 	"time"
 )
 
+// Circular structs.
+type CircularHero struct {
+	PrimaryDroid    CircularDroid
+	SecondaryDroids []CircularDroid
+	OtherDroids     []*CircularDroid
+
+	Human struct {
+		Height float64
+	}
+
+	BestFriend *CircularFriend  // should not be serialized
+	Friends    []CircularFriend // should not be serialized
+}
+
+type CircularDroid struct {
+	PrimaryFunction string
+	Owner           *CircularOwner
+}
+
+type CircularOwner struct {
+	Name String
+
+	Hero   CircularHero    // should not be serialized
+	Friend *CircularHero   // should not be serialized
+	Peers  []*CircularHero // should not be serialized
+}
+
+type CircularFriend struct {
+	Hero CircularHero
+}
+
 func TestConstructQuery(t *testing.T) {
 	tests := []struct {
-		inV         interface{}
-		inVariables map[string]interface{}
-		want        string
+		name      string
+		v         interface{}
+		variables map[string]interface{}
+		want      string
 	}{
 		{
-			inV: struct {
+			v: struct {
 				Viewer struct {
 					Login      String
 					CreatedAt  DateTime
@@ -30,7 +62,7 @@ func TestConstructQuery(t *testing.T) {
 			want: `{viewer{login,createdAt,id,databaseId},rateLimit{cost,limit,remaining,resetAt}}`,
 		},
 		{
-			inV: struct {
+			v: struct {
 				Repository struct {
 					DatabaseID Int
 					URL        URI
@@ -51,12 +83,12 @@ func TestConstructQuery(t *testing.T) {
 							}
 						} `graphql:"comments(first:1after:\"Y3Vyc29yOjE5NTE4NDI1Ng==\")"`
 					} `graphql:"issue(number:1)"`
-				} `graphql:"repository(owner:\"shurcooL-test\"name:\"test-repo\")"`
+				} `graphql:"repository(owner:\"r0busta-test\"name:\"test-repo\")"`
 			}{},
-			want: `{repository(owner:"shurcooL-test"name:"test-repo"){databaseId,url,issue(number:1){comments(first:1after:"Y3Vyc29yOjE5NTE4NDI1Ng=="){edges{node{body,author{login},editor{login}},cursor}}}}}`,
+			want: `{repository(owner:"r0busta-test"name:"test-repo"){databaseId,url,issue(number:1){comments(first:1after:"Y3Vyc29yOjE5NTE4NDI1Ng=="){edges{node{body,author{login},editor{login}},cursor}}}}}`,
 		},
 		{
-			inV: func() interface{} {
+			v: func() interface{} {
 				type actor struct {
 					Login     String
 					AvatarURL URI
@@ -84,13 +116,13 @@ func TestConstructQuery(t *testing.T) {
 								}
 							} `graphql:"comments(first:1)"`
 						} `graphql:"issue(number:1)"`
-					} `graphql:"repository(owner:\"shurcooL-test\"name:\"test-repo\")"`
+					} `graphql:"repository(owner:\"r0busta-test\"name:\"test-repo\")"`
 				}{}
 			}(),
-			want: `{repository(owner:"shurcooL-test"name:"test-repo"){databaseId,url,issue(number:1){comments(first:1){edges{node{databaseId,author{login,avatarUrl,url},publishedAt,lastEditedAt,editor{login,avatarUrl,url},body,viewerCanUpdate},cursor}}}}}`,
+			want: `{repository(owner:"r0busta-test"name:"test-repo"){databaseId,url,issue(number:1){comments(first:1){edges{node{databaseId,author{login,avatarUrl,url},publishedAt,lastEditedAt,editor{login,avatarUrl,url},body,viewerCanUpdate},cursor}}}}}`,
 		},
 		{
-			inV: func() interface{} {
+			v: func() interface{} {
 				type actor struct {
 					Login     String
 					AvatarURL URI `graphql:"avatarUrl(size:72)"`
@@ -137,38 +169,38 @@ func TestConstructQuery(t *testing.T) {
 								}
 							} `graphql:"comments(first:1)"`
 						} `graphql:"issue(number:1)"`
-					} `graphql:"repository(owner:\"shurcooL-test\"name:\"test-repo\")"`
+					} `graphql:"repository(owner:\"r0busta-test\"name:\"test-repo\")"`
 				}{}
 			}(),
-			want: `{repository(owner:"shurcooL-test"name:"test-repo"){issue(number:1){author{login,avatarUrl(size:72),url},publishedAt,lastEditedAt,editor{login,avatarUrl(size:72),url},body,reactionGroups{content,users{totalCount},viewerHasReacted},viewerCanUpdate,comments(first:1){nodes{databaseId,author{login,avatarUrl(size:72),url},publishedAt,lastEditedAt,editor{login,avatarUrl(size:72),url},body,reactionGroups{content,users{totalCount},viewerHasReacted},viewerCanUpdate},pageInfo{endCursor,hasNextPage}}}}}`,
+			want: `{repository(owner:"r0busta-test"name:"test-repo"){issue(number:1){author{login,avatarUrl(size:72),url},publishedAt,lastEditedAt,editor{login,avatarUrl(size:72),url},body,reactionGroups{content,users{totalCount},viewerHasReacted},viewerCanUpdate,comments(first:1){nodes{databaseId,author{login,avatarUrl(size:72),url},publishedAt,lastEditedAt,editor{login,avatarUrl(size:72),url},body,reactionGroups{content,users{totalCount},viewerHasReacted},viewerCanUpdate},pageInfo{endCursor,hasNextPage}}}}}`,
 		},
 		{
-			inV: struct {
+			v: struct {
 				Repository struct {
 					Issue struct {
 						Body String
 					} `graphql:"issue(number: 1)"`
-				} `graphql:"repository(owner:\"shurcooL-test\"name:\"test-repo\")"`
+				} `graphql:"repository(owner:\"r0busta-test\"name:\"test-repo\")"`
 			}{},
-			want: `{repository(owner:"shurcooL-test"name:"test-repo"){issue(number: 1){body}}}`,
+			want: `{repository(owner:"r0busta-test"name:"test-repo"){issue(number: 1){body}}}`,
 		},
 		{
-			inV: struct {
+			v: struct {
 				Repository struct {
 					Issue struct {
 						Body String
 					} `graphql:"issue(number: $issueNumber)"`
 				} `graphql:"repository(owner: $repositoryOwner, name: $repositoryName)"`
 			}{},
-			inVariables: map[string]interface{}{
-				"repositoryOwner": String("shurcooL-test"),
+			variables: map[string]interface{}{
+				"repositoryOwner": String("r0busta-test"),
 				"repositoryName":  String("test-repo"),
 				"issueNumber":     Int(1),
 			},
 			want: `query($issueNumber:Int!$repositoryName:String!$repositoryOwner:String!){repository(owner: $repositoryOwner, name: $repositoryName){issue(number: $issueNumber){body}}}`,
 		},
 		{
-			inV: struct {
+			v: struct {
 				Repository struct {
 					Issue struct {
 						ReactionGroups []struct {
@@ -181,16 +213,16 @@ func TestConstructQuery(t *testing.T) {
 					} `graphql:"issue(number: $issueNumber)"`
 				} `graphql:"repository(owner: $repositoryOwner, name: $repositoryName)"`
 			}{},
-			inVariables: map[string]interface{}{
-				"repositoryOwner": String("shurcooL-test"),
+			variables: map[string]interface{}{
+				"repositoryOwner": String("r0busta-test"),
 				"repositoryName":  String("test-repo"),
 				"issueNumber":     Int(1),
 			},
 			want: `query($issueNumber:Int!$repositoryName:String!$repositoryOwner:String!){repository(owner: $repositoryOwner, name: $repositoryName){issue(number: $issueNumber){reactionGroups{users(first:10){nodes{login}}}}}}`,
 		},
-		// Embedded structs without graphql tag should be inlined in query.
 		{
-			inV: func() interface{} {
+			name: "embedded structs without graphql tag should be inlined in query",
+			v: func() interface{} {
 				type actor struct {
 					Login     String
 					AvatarURL URI
@@ -217,7 +249,7 @@ func TestConstructQuery(t *testing.T) {
 			want: `{actor{login,avatarUrl,url},createdAt,... on IssueComment{body},currentTitle,previousTitle,label{name,color}}`,
 		},
 		{
-			inV: struct {
+			v: struct {
 				Viewer struct {
 					Login      string
 					CreatedAt  time.Time
@@ -227,12 +259,21 @@ func TestConstructQuery(t *testing.T) {
 			}{},
 			want: `{viewer{login,createdAt,id,databaseId}}`,
 		},
+		{
+			name: "does't serialize potentially circular types",
+			v:    CircularHero{},
+			want: `{primaryDroid{primaryFunction,owner{name,peers{otherDroids{primaryFunction},human{height}}}},secondaryDroids{primaryFunction,owner{name,peers{otherDroids{primaryFunction},human{height}}}},otherDroids{primaryFunction,owner{name,peers{human{height}}}},human{height}}`,
+		},
 	}
-	for _, tc := range tests {
-		got := constructQuery(tc.inV, tc.inVariables)
-		if got != tc.want {
-			t.Errorf("\ngot:  %q\nwant: %q\n", got, tc.want)
-		}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := constructQuery(tt.v, tt.variables)
+			if got != tt.want {
+				t.Errorf("\ngot:  %q\nwant: %q\n", got, tt.want)
+			}
+		})
 	}
 }
 
@@ -263,16 +304,17 @@ func TestConstructMutation(t *testing.T) {
 			want: `mutation($input:AddReactionInput!){addReaction(input:$input){subject{reactionGroups{users{totalCount}}}}}`,
 		},
 	}
-	for _, tc := range tests {
-		got := constructMutation(tc.inV, tc.inVariables)
-		if got != tc.want {
-			t.Errorf("\ngot:  %q\nwant: %q\n", got, tc.want)
+	for _, tt := range tests {
+		got := constructMutation(tt.inV, tt.inVariables)
+		if got != tt.want {
+			t.Errorf("\ngot:  %q\nwant: %q\n", got, tt.want)
 		}
 	}
 }
 
 func TestQueryArguments(t *testing.T) {
 	tests := []struct {
+		name string
 		in   map[string]interface{}
 		want string
 	}{
@@ -314,11 +356,15 @@ func TestQueryArguments(t *testing.T) {
 			want: `$ids:[ID!]`,
 		},
 	}
-	for i, tc := range tests {
-		got := queryArguments(tc.in)
-		if got != tc.want {
-			t.Errorf("test case %d:\n got: %q\nwant: %q", i, got, tc.want)
-		}
+	for i, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := queryArguments(tt.in)
+			if got != tt.want {
+				t.Errorf("test case %d:\n got: %q\nwant: %q", i, got, tt.want)
+			}
+		})
 	}
 }
 

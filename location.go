@@ -2,24 +2,23 @@ package shopify
 
 import (
 	"context"
+	"fmt"
 
-	"github.com/gempages/go-shopify-graphql/graphql"
+	"github.com/gempages/go-shopify-graphql/graph/models"
 )
 
+//go:generate mockgen -destination=./mock/location_service.go -package=mock . LocationService
 type LocationService interface {
-	Get(id graphql.ID) (*Location, error)
+	Get(id string) (*models.Location, error)
 }
 
 type LocationServiceOp struct {
 	client *Client
 }
 
-type Location struct {
-	ID   graphql.ID     `json:"id,omitempty"`
-	Name graphql.String `json:"name,omitempty"`
-}
+var _ LocationService = &LocationServiceOp{}
 
-func (s *LocationServiceOp) Get(id graphql.ID) (*Location, error) {
+func (s *LocationServiceOp) Get(id string) (*models.Location, error) {
 	q := `query location($id: ID!) {
 		location(id: $id){
 			id
@@ -31,12 +30,12 @@ func (s *LocationServiceOp) Get(id graphql.ID) (*Location, error) {
 		"id": id,
 	}
 
-	out := struct {
-		Location *Location `json:"location"`
-	}{}
+	var out struct {
+		*models.Location `json:"location"`
+	}
 	err := s.client.gql.QueryString(context.Background(), q, vars, &out)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("query: %w", err)
 	}
 
 	return out.Location, nil

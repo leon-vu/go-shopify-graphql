@@ -14,6 +14,17 @@ import (
 	"golang.org/x/net/context/ctxhttp"
 )
 
+//go:generate mockgen -destination=./mock/graphql.go -package=mock . GraphQL
+type GraphQL interface {
+	QueryString(ctx context.Context, q string, variables map[string]interface{}, v interface{}) error
+	Query(ctx context.Context, q interface{}, variables map[string]interface{}) error
+
+	Mutate(ctx context.Context, m interface{}, variables map[string]interface{}) error
+	MutateString(ctx context.Context, m string, variables map[string]interface{}, v interface{}) error
+
+	Context() context.Context
+}
+
 // Client is a GraphQL client.
 type Client struct {
 	url        string // GraphQL server URL.
@@ -50,7 +61,7 @@ func (c *Client) Context() context.Context {
 
 // QueryString executes a single GraphQL query request,
 // using the given raw query `q` and populating the response into the `v`.
-// `q` should be a correct GraphQL request string that corresponds to the GraphQL schema.
+// `q` should be a correct GraphQL query request string that corresponds to the GraphQL schema.
 func (c *Client) QueryString(ctx context.Context, q string, variables map[string]interface{}, v interface{}) error {
 	return c.do(ctx, q, variables, v)
 }
@@ -68,8 +79,14 @@ func (c *Client) Query(ctx context.Context, q interface{}, variables map[string]
 // m should be a pointer to struct that corresponds to the GraphQL schema.
 func (c *Client) Mutate(ctx context.Context, m interface{}, variables map[string]interface{}) error {
 	query := constructMutation(m, variables)
-	// return nil
 	return c.do(ctx, query, variables, m)
+}
+
+// MutateString executes a single GraphQL mutation request,
+// using the given raw query `m` and populating the response into it.
+// `m` should be a correct GraphQL mutation request string that corresponds to the GraphQL schema.
+func (c *Client) MutateString(ctx context.Context, m string, variables map[string]interface{}, v interface{}) error {
+	return c.do(ctx, m, variables, v)
 }
 
 // do executes a single GraphQL operation.
@@ -78,6 +95,7 @@ func (c *Client) do(ctx context.Context, query string, variables map[string]inte
 		ctx = c.ctx
 	}
 	var err error
+
 	in := struct {
 		Query     string                 `json:"query"`
 		Variables map[string]interface{} `json:"variables,omitempty"`
@@ -123,7 +141,6 @@ func (c *Client) do(ctx context.Context, query string, variables map[string]inte
 		// TODO: Consider including response body in returned error, if deemed helpful.
 		return err
 	}
-	// xx := make(map[string]interface{})
 	if out.Data != nil {
 		err := json.Unmarshal(*out.Data, v)
 		if err != nil {
@@ -159,5 +176,5 @@ type operationType uint8
 const (
 	queryOperation operationType = iota
 	mutationOperation
-	//subscriptionOperation // Unused.
+	// subscriptionOperation // Unused.
 )

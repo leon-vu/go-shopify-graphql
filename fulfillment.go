@@ -4,48 +4,27 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/gempages/go-shopify-graphql/graphql"
+	"github.com/gempages/go-shopify-graphql/graph/models"
 )
 
+//go:generate mockgen -destination=./mock/fulfillment_service.go -package=mock . FulfillmentService
 type FulfillmentService interface {
-	Create(input FulfillmentV2Input) error
+	Create(input models.FulfillmentV2Input) error
 }
 
 type FulfillmentServiceOp struct {
 	client *Client
 }
 
-type FulfillmentV2Input struct {
-	LineItemsByFulfillmentOrder []FulfillmentOrderLineItemsInput `json:"lineItemsByFulfillmentOrder,omitempty"`
-	NotifyCustomer              graphql.Boolean                  `json:"notifyCustomer,omitempty"`
-	TrackingInfo                FulfillmentTrackingInput         `json:"trackingInfo,omitempty"`
-}
-
-type FulfillmentOrderLineItemsInput struct {
-	FulfillmentOrderID        graphql.ID                      `json:"fulfillmentOrderId,omitempty"`
-	FulfillmentOrderLineItems []FulfillmentOrderLineItemInput `json:"fulfillmentOrderLineItems,omitempty"`
-}
-
-type FulfillmentOrderLineItemInput struct {
-	ID       graphql.ID  `json:"id,omitempty"`
-	Quantity graphql.Int `json:"quantity,omitempty"`
-}
-
-type FulfillmentTrackingInput struct {
-	Company graphql.String `json:"company,omitempty"`
-	Number  graphql.String `json:"number,omitempty"`
-	URL     URL            `json:"url,omitempty"`
-}
+var _ FulfillmentService = &FulfillmentServiceOp{}
 
 type mutationFulfillmentCreateV2 struct {
-	FulfillmentCreateV2Result FulfillmentCreateV2Result `graphql:"fulfillmentCreateV2(fulfillment: $fulfillment)" json:"fulfillmentCreateV2"`
+	FulfillmentCreateV2Result struct {
+		UserErrors []models.UserError `json:"userErrors,omitempty"`
+	} `graphql:"fulfillmentCreateV2(fulfillment: $fulfillment)" json:"fulfillmentCreateV2"`
 }
 
-type FulfillmentCreateV2Result struct {
-	UserErrors []UserErrors `json:"userErrors,omitempty"`
-}
-
-func (s *FulfillmentServiceOp) Create(fulfillment FulfillmentV2Input) error {
+func (s *FulfillmentServiceOp) Create(fulfillment models.FulfillmentV2Input) error {
 	m := mutationFulfillmentCreateV2{}
 
 	vars := map[string]interface{}{
@@ -53,7 +32,7 @@ func (s *FulfillmentServiceOp) Create(fulfillment FulfillmentV2Input) error {
 	}
 	err := s.client.gql.Mutate(context.Background(), &m, vars)
 	if err != nil {
-		return fmt.Errorf("Mutation error: %s", err)
+		return fmt.Errorf("mutation: %w", err)
 	}
 
 	if len(m.FulfillmentCreateV2Result.UserErrors) > 0 {

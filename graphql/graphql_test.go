@@ -1,175 +1,181 @@
-package graphql
+package graphql_test
 
 import (
 	"context"
-	"encoding/json"
-	_errors "errors"
-	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"reflect"
 	"testing"
-	"time"
+
+	"github.com/r0busta/graphql"
 )
 
-// func TestDo(t *testing.T) {
-// }
-
-type Response struct {
-	ID          int    `json:"id"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
-}
-
-func MakeHTTPCall(url string) (*Response, error) {
-	resp, err := http.Get(url)
-	if err != nil {
-		return nil, err
-	}
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	r := &Response{}
-	if err := json.Unmarshal(body, r); err != nil {
-		return nil, err
-	}
-	return r, nil
-}
-
-func TestDo(t *testing.T) {
-	testTable := []struct {
-		name             string
-		server           *httptest.Server
-		expectedResponse *Response
-		expectedErr      error
-	}{
-		{
-			name: "happy-server-response",
-			server: httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				w.WriteHeader(http.StatusOK)
-				w.Write([]byte(`{"id": 1, "name": "kyle", "description": "novice gopher"}`))
-			})),
-			expectedResponse: &Response{
-				ID:          1,
-				Name:        "kyle",
-				Description: "novice gopher",
+func TestClient_Query_partialDataWithErrorResponse(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/graphql", func(w http.ResponseWriter, req *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		mustWrite(w, `{
+			"data": {
+				"node1": {
+					"id": "MDEyOklzc3VlQ29tbWVudDE2OTQwNzk0Ng=="
+				},
+				"node2": null
 			},
-			expectedErr: nil,
-		},
+			"errors": [
+				{
+					"message": "Could not resolve to a node with the global id of 'NotExist'",
+					"type": "NOT_FOUND",
+					"path": [
+						"node2"
+					],
+					"locations": [
+						{
+							"line": 10,
+							"column": 4
+						}
+					]
+				}
+			]
+		}`)
+	})
+	client := graphql.NewClient("/graphql", &http.Client{Transport: localRoundTripper{handler: mux}})
+
+	var q struct {
+		Node1 *struct {
+			ID graphql.ID
+		} `graphql:"node1: node(id: \"MDEyOklzc3VlQ29tbWVudDE2OTQwNzk0Ng==\")"`
+		Node2 *struct {
+			ID graphql.ID
+		} `graphql:"node2: node(id: \"NotExist\")"`
 	}
-	for _, tc := range testTable {
-		t.Run(tc.name, func(t *testing.T) {
-			defer tc.server.Close()
-			resp, err := MakeHTTPCall(tc.server.URL)
-			if !reflect.DeepEqual(resp, tc.expectedResponse) {
-				t.Errorf("expected (%v), got (%v)", tc.expectedResponse, resp)
-			}
-			if !_errors.Is(err, tc.expectedErr) {
-				t.Errorf("expected (%v), got (%v)", tc.expectedErr, err)
-			}
-		})
+	err := client.Query(context.Background(), &q, nil)
+	if err == nil {
+		t.Fatal("got error: nil, want: non-nil")
+	}
+	if got, want := err.Error(), "Could not resolve to a node with the global id of 'NotExist'"; got != want {
+		t.Errorf("got error: %v, want: %v", got, want)
+	}
+	if q.Node1 == nil || q.Node1.ID != "MDEyOklzc3VlQ29tbWVudDE2OTQwNzk0Ng==" {
+		t.Errorf("got wrong q.Node1: %v", q.Node1)
+	}
+	if q.Node2 != nil {
+		t.Errorf("got non-nil q.Node2: %v, want: nil", *q.Node2)
 	}
 }
 
-func TestQuery(t *testing.T) {
-	timeNow := time.Now()
-	testTable := []struct {
-		name             string
-		server           *httptest.Server
-		expectedResponse *Response
-		expectedErr      error
-	}{
-		{
-			name: "throtled_query",
-			server: httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				os.Create("/home/dragonborn/work/ES-HL/pull/go-shopify-graphql-modified/go-shopify-graphql/graphql/testttttttttttttttttt.go")
-				fmt.Println("in mock serverrrrrrrrrrrrrrrrrrrrrr")
-				var in struct {
-					Query     string                 `json:"query"`
-					Variables map[string]interface{} `json:"variables,omitempty"`
+func TestClient_Query_noDataWithErrorResponse(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/graphql", func(w http.ResponseWriter, req *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		mustWrite(w, `{
+			"errors": [
+				{
+					"message": "Field 'user' is missing required arguments: login",
+					"locations": [
+						{
+							"line": 7,
+							"column": 3
+						}
+					]
 				}
-				_ = json.NewDecoder(r.Body).Decode(&in)
-				if timeNow.Sub(time.Now()) < 2*time.Second {
-					w.WriteHeader(http.StatusOK)
-					w.Write([]byte(`{"id": 1, "name": "kyle", "description": "novice gopher"}`))
-				}
-				// if in.Query == "throtled_query" {
-				// 	w.WriteHeader(http.StatusOK)
-				// 	w.Write([]byte(`{"id": 1, "name": "kyle", "description": "novice gopher"}`))
-				// }
-				// if in.Query == "nice_query" {
-				// 	w.WriteHeader(http.StatusOK)
-				// 	w.Write([]byte(`{"id": 1, "name": "kyle", "description": "novice gopher"}`))
-				// }
-			})),
-			expectedResponse: &Response{
-				ID:          1,
-				Name:        "kyle",
-				Description: "novice gopher",
-			},
-			expectedErr: nil,
-		},
+			]
+		}`)
+	})
+	client := graphql.NewClient("/graphql", &http.Client{Transport: localRoundTripper{handler: mux}})
+
+	var q struct {
+		User struct {
+			Name graphql.String
+		}
 	}
-	for _, tc := range testTable {
-		t.Run(tc.name, func(t *testing.T) {
-			defer tc.server.Close()
-			c := NewClient(tc.server.URL, tc.server.Client())
-			var m map[string]interface{}
-			var v interface{}
-			t1 := time.Now()
-			fmt.Println("hehehe")
-			_ = c.do(context.Background(), tc.name, m, v)
-			t2 := time.Now()
-			if t1.Sub(t2) < 2*time.Second {
-				t.Error("too much time")
-			}
-			// resp, err := MakeHTTPCall(tc.server.URL)
-			// if !reflect.DeepEqual(resp, tc.expectedResponse) {
-			// 	t.Errorf("expected (%v), got (%v)", tc.expectedResponse, resp)
-			// }
-			// if !_errors.Is(err, tc.expectedErr) {
-			// 	t.Errorf("expected (%v), got (%v)", tc.expectedErr, err)
-			// }
-		})
+	err := client.Query(context.Background(), &q, nil)
+	if err == nil {
+		t.Fatal("got error: nil, want: non-nil")
+	}
+	if got, want := err.Error(), "Field 'user' is missing required arguments: login"; got != want {
+		t.Errorf("got error: %v, want: %v", got, want)
+	}
+	if q.User.Name != "" {
+		t.Errorf("got non-empty q.User.Name: %v", q.User.Name)
 	}
 }
 
-// type API struct {
-// 	Client  *http.Client
-// 	baseURL string
-// }
+func TestClient_Query_errorStatusCode(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/graphql", func(w http.ResponseWriter, req *http.Request) {
+		http.Error(w, "important message", http.StatusInternalServerError)
+	})
+	client := graphql.NewClient("/graphql", &http.Client{Transport: localRoundTripper{handler: mux}})
 
-// func (api *API) DoStuff() ([]byte, error) {
-// 	resp, err := api.Client.Get(api.baseURL + "/some/path")
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	defer resp.Body.Close()
-// 	body, err := ioutil.ReadAll(resp.Body)
-// 	// handling error and doing stuff with body that needs to be unit tested
-// 	return body, err
-// }
+	var q struct {
+		User struct {
+			Name graphql.String
+		}
+	}
+	err := client.Query(context.Background(), &q, nil)
+	if err == nil {
+		t.Fatal("got error: nil, want: non-nil")
+	}
+	if got, want := err.Error(), `non-200 OK status code: 500 Internal Server Error body: "important message\n"`; got != want {
+		t.Errorf("got error: %v, want: %v", got, want)
+	}
+	if q.User.Name != "" {
+		t.Errorf("got non-empty q.User.Name: %v", q.User.Name)
+	}
+}
 
-// func TestDoStuffWithTestServer(t *testing.T) {
-// 	// Start a local HTTP server
-// 	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-// 		// Test request parameters
-// 		os.Create("/home/dragonborn/work/ES-HL/pull/go-shopify-graphql-modified/go-shopify-graphql/graphql/testttttttttttttttttt.go")
-// 		// equals(t, req.URL.String(), "/some/path")
-// 		// Send response to be tested
-// 		rw.Write([]byte(`OK`))
-// 	}))
-// 	// Close the server when test finishes
-// 	defer server.Close()
+// Test that an empty (but non-nil) variables map is
+// handled no differently than a nil variables map.
+func TestClient_Query_emptyVariables(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/graphql", func(w http.ResponseWriter, req *http.Request) {
+		body := mustRead(req.Body)
+		if got, want := body, `{"query":"{user{name}}"}`+"\n"; got != want {
+			t.Errorf("got body: %v, want %v", got, want)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		mustWrite(w, `{"data": {"user": {"name": "Gopher"}}}`)
+	})
+	client := graphql.NewClient("/graphql", &http.Client{Transport: localRoundTripper{handler: mux}})
 
-// 	// Use Client & URL from our local test server
-// 	api := API{server.Client(), server.URL}
-// 	api.DoStuff()
+	var q struct {
+		User struct {
+			Name string
+		}
+	}
+	err := client.Query(context.Background(), &q, map[string]interface{}{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := q.User.Name, "Gopher"; got != want {
+		t.Errorf("got q.User.Name: %q, want: %q", got, want)
+	}
+}
 
-// 	// ok(t, err)
-// 	// equals(t, []byte("OK"), body)
+// localRoundTripper is an http.RoundTripper that executes HTTP transactions
+// by using handler directly, instead of going over an HTTP connection.
+type localRoundTripper struct {
+	handler http.Handler
+}
 
-// }
+func (l localRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	w := httptest.NewRecorder()
+	l.handler.ServeHTTP(w, req)
+	return w.Result(), nil
+}
+
+func mustRead(r io.Reader) string {
+	b, err := ioutil.ReadAll(r)
+	if err != nil {
+		panic(err)
+	}
+	return string(b)
+}
+
+func mustWrite(w io.Writer, s string) {
+	_, err := io.WriteString(w, s)
+	if err != nil {
+		panic(err)
+	}
+}
